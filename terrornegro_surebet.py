@@ -12,7 +12,7 @@ CHAT_ID = "8381462754"
 # API
 # ==========================================
 
-API_KEY = "1100741a3689b93a91053f60dd2e7ac5"
+API_KEY = "d945bfa2b2656d4029f0f3890de253be"
 
 SPORTS = [
     # ---- LIGAS ORIGINAIS ----
