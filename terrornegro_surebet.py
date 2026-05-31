@@ -524,5 +524,5 @@ while True:
     # AGUARDAR 60 SEGUNDOS E REPETIR
     # ======================================
 
-    print("⏳ Aguardando 60 segundos para próxima varredura...")
-    time.sleep(60)
+    print("⏳ Aguardando 10 minutos para próxima varredura...")
+    time.sleep(600)
