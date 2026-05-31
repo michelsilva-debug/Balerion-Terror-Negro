@@ -1,5 +1,6 @@
 import requests
 import time
+from datetime import datetime, timedelta
 
 # ==========================================
 # TELEGRAM
@@ -23,11 +24,11 @@ SPORTS = [
     "soccer_australia_aleague",
     "soccer_epl",
     # ---- NOVAS LIGAS ----
-    "soccer_brazil_campeonato",       # Brasileirão Série A
-    "soccer_spain_la_liga",           # La Liga
-    "soccer_uefa_champs_league",      # Champions League
-    "soccer_italy_serie_a",           # Serie A
-    "soccer_germany_bundesliga",      # Bundesliga
+    "soccer_brazil_campeonato",
+    "soccer_spain_la_liga",
+    "soccer_uefa_champs_league",
+    "soccer_italy_serie_a",
+    "soccer_germany_bundesliga",
 ]
 
 # ==========================================
@@ -47,20 +48,13 @@ CASAS = [
 # ==========================================
 
 def enviar_telegram(msg):
-
     try:
-
         requests.post(
             f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-            data={
-                "chat_id": CHAT_ID,
-                "text": msg
-            },
+            data={"chat_id": CHAT_ID, "text": msg},
             timeout=10
         )
-
     except Exception as erro:
-
         print("ERRO TELEGRAM:", erro)
 
 # ==========================================
@@ -68,21 +62,12 @@ def enviar_telegram(msg):
 # ==========================================
 
 def calcular_surebet(odd1, odd2):
-
     try:
-
         odd1 = float(odd1)
         odd2 = float(odd2)
-
-        lucro = round(
-            (1 - ((1 / odd1) + (1 / odd2))) * 100,
-            2
-        )
-
+        lucro = round((1 - ((1 / odd1) + (1 / odd2))) * 100, 2)
         return lucro
-
     except:
-
         return -100
 
 # ==========================================
@@ -90,18 +75,12 @@ def calcular_surebet(odd1, odd2):
 # ==========================================
 
 def odd_valida(valor):
-
     try:
-
         valor = float(valor)
-
         if valor >= 1.01 and valor <= 50:
             return True
-
         return False
-
     except:
-
         return False
 
 # ==========================================
@@ -109,21 +88,10 @@ def odd_valida(valor):
 # ==========================================
 
 def calcular_dupla_chance(odd_vitoria, odd_empate):
-
     try:
-
-        resultado = round(
-            1 / (
-                (1 / odd_vitoria) +
-                (1 / odd_empate)
-            ),
-            2
-        )
-
+        resultado = round(1 / ((1 / odd_vitoria) + (1 / odd_empate)), 2)
         return resultado
-
     except:
-
         return None
 
 # ==========================================
@@ -131,44 +99,18 @@ def calcular_dupla_chance(odd_vitoria, odd_empate):
 # ==========================================
 
 def verificar_surebet(lista1, lista2, mercado, jogo):
-
     try:
-
         if not lista1 or not lista2:
             return
-
-        melhor1 = max(
-            lista1,
-            key=lambda x: x["odd"]
-        )
-
-        melhor2 = max(
-            lista2,
-            key=lambda x: x["odd"]
-        )
-
-        # ======================================
-        # BLOQUEAR MESMA CASA
-        # ======================================
-
+        melhor1 = max(lista1, key=lambda x: x["odd"])
+        melhor2 = max(lista2, key=lambda x: x["odd"])
         if melhor1["casa"] == melhor2["casa"]:
             return
-
-        lucro = calcular_surebet(
-            melhor1["odd"],
-            melhor2["odd"]
-        )
-
-        # ======================================
-        # FILTRAR FALSAS
-        # ======================================
-
+        lucro = calcular_surebet(melhor1["odd"], melhor2["odd"])
         if lucro <= 1:
             return
-
         if lucro >= 35:
             return
-
         mensagem = f"""
 🚨 SUREBET ENCONTRADA
 
@@ -189,13 +131,9 @@ def verificar_surebet(lista1, lista2, mercado, jogo):
 
 🔥 Arbitragem REAL detectada
 """
-
         print(mensagem)
-
         enviar_telegram(mensagem)
-
     except Exception as erro:
-
         print("ERRO SUREBET:", erro)
 
 # ==========================================
@@ -213,316 +151,182 @@ while True:
 
     for SPORT in SPORTS:
 
-        url = f"https://api.the-odds-api.com/v4/sports/{SPORT}/odds"
+        try:
 
-        response = requests.get(
-            url,
-            params={
-                "apiKey": API_KEY,
-                "regions": "eu",
-                "markets": "h2h,totals",
-                "oddsFormat": "decimal"
-            },
-            timeout=15
-        )
+            url = f"https://api.the-odds-api.com/v4/sports/{SPORT}/odds"
 
-        print("Consultando:", SPORT)
-        print("Status:", response.status_code)
+            agora = datetime.utcnow()
+            ate = agora + timedelta(days=2)
 
-        if response.status_code != 200:
-            print("ERRO API:", response.status_code)
-            continue
+            response = requests.get(
+                url,
+                params={
+                    "apiKey": API_KEY,
+                    "regions": "eu",
+                    "markets": "h2h,totals",
+                    "oddsFormat": "decimal",
+                    "dateFormat": "iso",
+                    "commenceTimeFrom": agora.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "commenceTimeTo": ate.strftime("%Y-%m-%dT%H:%M:%SZ")
+                },
+                timeout=15
+            )
 
-        dados = response.json()
+            print("Consultando:", SPORT)
+            print("Status:", response.status_code)
 
-        if not isinstance(dados, list):
-            print("JSON INVÁLIDO")
-            continue
+            if response.status_code != 200:
+                print("ERRO API:", response.status_code)
+                continue
 
-        for jogo in dados:
+            dados = response.json()
 
-            try:
+            if not isinstance(dados, list):
+                print("JSON INVÁLIDO")
+                continue
 
-                if not isinstance(jogo, dict):
-                    continue
+            for jogo in dados:
 
-                home_team = jogo.get("home_team")
-                away_team = jogo.get("away_team")
+                try:
 
-                if not home_team or not away_team:
-                    continue
-
-                bookmakers = jogo.get("bookmakers", [])
-
-                if not isinstance(bookmakers, list):
-                    continue
-
-                # ======================================
-                # LISTAS
-                # ======================================
-
-                vitoria_a = []
-                dupla_b = []
-
-                vitoria_b = []
-                dupla_a = []
-
-                over15 = []
-                under15 = []
-
-                over25 = []
-                under25 = []
-
-                over35 = []
-                under35 = []
-
-                # ======================================
-                # BOOKMAKERS
-                # ======================================
-
-                for casa in bookmakers:
-
-                    try:
-
-                        if not isinstance(casa, dict):
-                            continue
-
-                        nome_casa = casa.get("title")
-
-                        if nome_casa not in CASAS:
-                            continue
-
-                        markets = casa.get("markets", [])
-
-                        if not isinstance(markets, list):
-                            continue
-
-                        # ======================================
-                        # MERCADOS
-                        # ======================================
-
-                        for market in markets:
-
-                            try:
-
-                                if not isinstance(market, dict):
-                                    continue
-
-                                market_key = market.get("key")
-
-                                outcomes = market.get("outcomes", [])
-
-                                if not isinstance(outcomes, list):
-                                    continue
-
-                                # ======================================
-                                # RESULTADO / DUPLA CHANCE
-                                # ======================================
-
-                                if market_key == "h2h":
-
-                                    empate_item = None
-                                    times = []
-
-                                    for o in outcomes:
-
-                                        if not isinstance(o, dict):
-                                            continue
-
-                                        nome = str(
-                                            o.get("name", "")
-                                        ).lower()
-
-                                        if nome in [
-                                            "draw",
-                                            "empate"
-                                        ]:
-
-                                            empate_item = o
-
-                                        else:
-
-                                            times.append(o)
-
-                                    if (
-                                        len(times) != 2
-                                        or empate_item is None
-                                    ):
-                                        continue
-
-                                    time_a = times[0]["name"]
-                                    time_b = times[1]["name"]
-
-                                    odd_a = times[0]["price"]
-                                    odd_b = times[1]["price"]
-
-                                    odd_empate = empate_item["price"]
-
-                                    if not (
-                                        odd_valida(odd_a)
-                                        and odd_valida(odd_b)
-                                        and odd_valida(odd_empate)
-                                    ):
-                                        continue
-
-                                    vitoria_a.append({
-                                        "casa": nome_casa,
-                                        "aposta": f"Vitória {time_a}",
-                                        "odd": odd_a
-                                    })
-
-                                    vitoria_b.append({
-                                        "casa": nome_casa,
-                                        "aposta": f"Vitória {time_b}",
-                                        "odd": odd_b
-                                    })
-
-                                    odd_dc_a = calcular_dupla_chance(
-                                        odd_a,
-                                        odd_empate
-                                    )
-
-                                    odd_dc_b = calcular_dupla_chance(
-                                        odd_b,
-                                        odd_empate
-                                    )
-
-                                    if odd_dc_a:
-
-                                        dupla_a.append({
-                                            "casa": nome_casa,
-                                            "aposta": f"{time_a} ou empate",
-                                            "odd": odd_dc_a
-                                        })
-
-                                    if odd_dc_b:
-
-                                        dupla_b.append({
-                                            "casa": nome_casa,
-                                            "aposta": f"{time_b} ou empate",
-                                            "odd": odd_dc_b
-                                        })
-
-                                # ======================================
-                                # OVER / UNDER
-                                # ======================================
-
-                                elif market_key == "totals":
-
-                                    for item in outcomes:
-
-                                        try:
-
-                                            if not isinstance(item, dict):
-                                                continue
-
-                                            nome = item.get("name")
-                                            odd = item.get("price")
-                                            ponto = item.get("point")
-
-                                            if not odd_valida(odd):
-                                                continue
-
-                                            if ponto == 1.5:
-
-                                                if nome == "Over":
-                                                    over15.append({
-                                                        "casa": nome_casa,
-                                                        "aposta": "Mais de 1.5 gols",
-                                                        "odd": odd
-                                                    })
-                                                elif nome == "Under":
-                                                    under15.append({
-                                                        "casa": nome_casa,
-                                                        "aposta": "Menos de 1.5 gols",
-                                                        "odd": odd
-                                                    })
-
-                                            elif ponto == 2.5:
-
-                                                if nome == "Over":
-                                                    over25.append({
-                                                        "casa": nome_casa,
-                                                        "aposta": "Mais de 2.5 gols",
-                                                        "odd": odd
-                                                    })
-                                                elif nome == "Under":
-                                                    under25.append({
-                                                        "casa": nome_casa,
-                                                        "aposta": "Menos de 2.5 gols",
-                                                        "odd": odd
-                                                    })
-
-                                            elif ponto == 3.5:
-
-                                                if nome == "Over":
-                                                    over35.append({
-                                                        "casa": nome_casa,
-                                                        "aposta": "Mais de 3.5 gols",
-                                                        "odd": odd
-                                                    })
-                                                elif nome == "Under":
-                                                    under35.append({
-                                                        "casa": nome_casa,
-                                                        "aposta": "Menos de 3.5 gols",
-                                                        "odd": odd
-                                                    })
-
-                                        except:
-                                            continue
-
-                            except:
-                                continue
-
-                    except:
+                    if not isinstance(jogo, dict):
                         continue
 
-                # ======================================
-                # VERIFICAR SUREBETS
-                # ======================================
+                    home_team = jogo.get("home_team")
+                    away_team = jogo.get("away_team")
 
-                verificar_surebet(
-                    vitoria_a,
-                    dupla_b,
-                    "Vitória Time A vs Time B ou empate",
-                    jogo
-                )
+                    if not home_team or not away_team:
+                        continue
 
-                verificar_surebet(
-                    vitoria_b,
-                    dupla_a,
-                    "Vitória Time B vs Time A ou empate",
-                    jogo
-                )
+                    bookmakers = jogo.get("bookmakers", [])
 
-                verificar_surebet(
-                    over15,
-                    under15,
-                    "Over 1.5 vs Under 1.5",
-                    jogo
-                )
+                    if not isinstance(bookmakers, list):
+                        continue
 
-                verificar_surebet(
-                    over25,
-                    under25,
-                    "Over 2.5 vs Under 2.5",
-                    jogo
-                )
+                    vitoria_a = []
+                    dupla_b = []
+                    vitoria_b = []
+                    dupla_a = []
+                    over15 = []
+                    under15 = []
+                    over25 = []
+                    under25 = []
+                    over35 = []
+                    under35 = []
 
-                verificar_surebet(
-                    over35,
-                    under35,
-                    "Over 3.5 vs Under 3.5",
-                    jogo
-                )
+                    for casa in bookmakers:
 
-            except Exception as erro_jogo:
+                        try:
 
-                print("ERRO JOGO:", erro_jogo)
+                            if not isinstance(casa, dict):
+                                continue
 
-    # ======================================
-    # AGUARDAR 60 SEGUNDOS E REPETIR
-    # ======================================
+                            nome_casa = casa.get("title")
 
-    print("⏳ Aguardando 10 minutos para próxima varredura...")
+                            if nome_casa not in CASAS:
+                                continue
+
+                            markets = casa.get("markets", [])
+
+                            if not isinstance(markets, list):
+                                continue
+
+                            for market in markets:
+
+                                try:
+
+                                    if not isinstance(market, dict):
+                                        continue
+
+                                    market_key = market.get("key")
+                                    outcomes = market.get("outcomes", [])
+
+                                    if not isinstance(outcomes, list):
+                                        continue
+
+                                    if market_key == "h2h":
+
+                                        empate_item = None
+                                        times = []
+
+                                        for o in outcomes:
+                                            if not isinstance(o, dict):
+                                                continue
+                                            nome = str(o.get("name", "")).lower()
+                                            if nome in ["draw", "empate"]:
+                                                empate_item = o
+                                            else:
+                                                times.append(o)
+
+                                        if len(times) != 2 or empate_item is None:
+                                            continue
+
+                                        time_a = times[0]["name"]
+                                        time_b = times[1]["name"]
+                                        odd_a = times[0]["price"]
+                                        odd_b = times[1]["price"]
+                                        odd_empate = empate_item["price"]
+
+                                        if not (odd_valida(odd_a) and odd_valida(odd_b) and odd_valida(odd_empate)):
+                                            continue
+
+                                        vitoria_a.append({"casa": nome_casa, "aposta": f"Vitória {time_a}", "odd": odd_a})
+                                        vitoria_b.append({"casa": nome_casa, "aposta": f"Vitória {time_b}", "odd": odd_b})
+
+                                        odd_dc_a = calcular_dupla_chance(odd_a, odd_empate)
+                                        odd_dc_b = calcular_dupla_chance(odd_b, odd_empate)
+
+                                        if odd_dc_a:
+                                            dupla_a.append({"casa": nome_casa, "aposta": f"{time_a} ou empate", "odd": odd_dc_a})
+                                        if odd_dc_b:
+                                            dupla_b.append({"casa": nome_casa, "aposta": f"{time_b} ou empate", "odd": odd_dc_b})
+
+                                    elif market_key == "totals":
+
+                                        for item in outcomes:
+                                            try:
+                                                if not isinstance(item, dict):
+                                                    continue
+                                                nome = item.get("name")
+                                                odd = item.get("price")
+                                                ponto = item.get("point")
+                                                if not odd_valida(odd):
+                                                    continue
+                                                if ponto == 1.5:
+                                                    if nome == "Over":
+                                                        over15.append({"casa": nome_casa, "aposta": "Mais de 1.5 gols", "odd": odd})
+                                                    elif nome == "Under":
+                                                        under15.append({"casa": nome_casa, "aposta": "Menos de 1.5 gols", "odd": odd})
+                                                elif ponto == 2.5:
+                                                    if nome == "Over":
+                                                        over25.append({"casa": nome_casa, "aposta": "Mais de 2.5 gols", "odd": odd})
+                                                    elif nome == "Under":
+                                                        under25.append({"casa": nome_casa, "aposta": "Menos de 2.5 gols", "odd": odd})
+                                                elif ponto == 3.5:
+                                                    if nome == "Over":
+                                                        over35.append({"casa": nome_casa, "aposta": "Mais de 3.5 gols", "odd": odd})
+                                                    elif nome == "Under":
+                                                        under35.append({"casa": nome_casa, "aposta": "Menos de 3.5 gols", "odd": odd})
+                                            except:
+                                                continue
+
+                                except:
+                                    continue
+
+                        except:
+                            continue
+
+                    verificar_surebet(vitoria_a, dupla_b, "Vitória Time A vs Time B ou empate", jogo)
+                    verificar_surebet(vitoria_b, dupla_a, "Vitória Time B vs Time A ou empate", jogo)
+                    verificar_surebet(over15, under15, "Over 1.5 vs Under 1.5", jogo)
+                    verificar_surebet(over25, under25, "Over 2.5 vs Under 2.5", jogo)
+                    verificar_surebet(over35, under35, "Over 3.5 vs Under 3.5", jogo)
+
+                except Exception as erro_jogo:
+                    print("ERRO JOGO:", erro_jogo)
+
+        except Exception as erro_sport:
+            print(f"ERRO SPORT {SPORT}:", erro_sport)
+
+    print("⏳ Aguardando 10 minutos para a próxima varredura...")
     time.sleep(600)
